@@ -1,0 +1,173 @@
+#!/bin/bash
+
+platform='unknown'
+unamestr=$(uname)
+
+
+#PROTO="https"
+PROTO="http"
+HCORP_RELEASE="releases.hashicorp.com"
+HCORP_DIR="/opt/hashicorp"
+PRODUCT="terraform"
+
+function get_os() {
+	case "${OSTYPE}" in
+	  solaris*) echo "solaris" ;;
+	  darwin*)  echo "osx" ;; 
+	  linux*)   echo "linux" ;;
+	  bsd*)     echo "freebsd" ;;
+	  msys*)    echo "windows" ;;
+	  *)        echo "unknown: ${OSTYPE}" ;;
+	esac
+}
+
+function get_arch() {
+	arch=$(uname -m)
+	case "${arch}" in
+	  x86_64*) echo "amd64" ;;
+	  x86_32*) echo "x86" ;;
+	  *)       echo "unknown: ${arch}" ;;
+	esac
+}
+
+function test_sudo_user() {
+	if [[ -z ${SUDO_USER} ]]
+	then
+		echo "run with sudo"
+		exit 64
+	fi
+}
+
+function test_depends() {
+	local current_os=${1}
+	case "${current_os}" in
+		solaris*) echo "solaris todo" ;;
+		darwin*)  echo "osx todo" ;; 
+		linux*)
+			if [[ ! -x /usr/bin/unzip ]]; then
+				echo "install unzip"
+				exit 65
+			fi
+			if [[ ! -x /usr/bin/curl ]]; then
+				echo "install curl"
+				exit 65
+			fi
+			if [[ ! -x /usr/bin/wget ]]; then
+				echo "install wget"
+				exit 65
+			fi
+		;;
+		bsd*)     echo "freebsd todo" ;;
+		msys*)    echo "windows is not supported." && exit 666 ;;
+		*)        echo "unknown: ${current_os}" ;;
+	esac
+}
+
+function list_installed_version() {
+	if [[ -d ${HCORP_DIR}/${PRODUCT} ]]
+	then
+		versions=$(find ${HCORP_DIR} -mindepth 1 -type d)
+	else
+		echo "No installed version"
+	fi
+}
+
+function check_version_is_installed() {
+	if [[ ! -x ${HCORP_DIR}/${PRODUCT}/${version}/terraform ]]
+	then
+		echo "false"
+	else
+		echo "true"
+	fi
+}
+
+function get_zip_url() {
+	# http://releases.hashicorp.com/terraform/0.11.1/terraform_0.11.1_linux_amd64.zip
+	zip_url=$(printf "%s://%s/%s/%s/%s_%s_%s_%s.zip" ${PROTO} ${HCORP_RELEASE} ${PRODUCT} ${version} ${PRODUCT} ${version} ${current_os} ${current_arch} ) 
+	echo ${zip_url}
+}
+
+# https://gist.github.com/hrwgc/7455343
+function validate_url() {
+  echo "wget -S --spider $1  2>&1 | grep 'HTTP/1.1 200 OK'"
+  if [[ `wget -S --spider $1  2>&1 | grep 'HTTP/1.1 200 OK'` ]]; then echo "true"; else echo "false"; fi
+}
+
+function get_zip_name() {
+	# terraform_0.11.1_linux_amd64.zip
+	zip_name=$(printf "%s_%s_%s_%s.zip" ${PRODUCT} ${version} ${current_os} ${current_arch} ) 
+	echo ${zip_name}
+}
+
+function wget_zip() {
+	# http://releases.hashicorp.com/terraform/0.11.1/terraform_0.11.1_linux_amd64.zip
+	wget --quiet ${zip} --output-document=/tmp/${zipname}
+}
+
+function create_version_folder() {
+	folder=$(printf "%s/%s/%s" ${HCORP_DIR} ${PRODUCT} ${version})
+	mkdir -p ${folder}
+}
+
+function unzip_archive() {
+	# unzip -qq /tmp/terraform_0.11.1_linux_amd64.zip -d /home/hugues/opt/hashicorp/terraform/0.11.1/
+	unzip -o -f -qq /tmp/${zipname} -d ${folder}
+	rm -f /tmp/${zipname}
+}
+
+function create_link() {
+	ln -fs ${folder}/terraform /usr/local/bin/terraform
+}
+
+function run_tf_version() {
+	terraform version
+}
+
+
+if [ $# -eq 0 ]
+then
+	echo "List installed version"
+	list_installed_version
+else
+	version=${1}
+	current_os=$(get_os)
+	current_arch=$(get_arch)
+
+	test_sudo_user
+	test_depends ${current_os}
+
+	echo "Check version is installed"
+	version_is_installed=$(check_version_is_installed)
+	echo ${version_is_installed}
+
+	if [[ "${version_is_installed}" -eq "1" ]]
+	then
+		echo "version ${version} is installed"
+	else
+		echo "version ${version} is not installed"
+		zip=$(get_zip_url)
+
+		url_exists=$(validate_url ${zip})
+		echo ${url_exists}
+		exit 0
+
+		zipname=$(get_zip_name)
+
+		wget_zip
+		create_version_folder
+		unzip_archive
+		create_link
+	fi
+
+	#echo "version installed : create symbolic link"
+	#echo "version not installed : "
+	#echo "get url for this OS"
+	#echo "download to tmp"
+	#echo "create version folder"
+	#echo "unzip archive to folder"
+	#echo "delete archive"
+	#echo "create symbolic link"
+fi
+
+#rm ${zipname}
+
