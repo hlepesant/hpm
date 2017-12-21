@@ -2,7 +2,7 @@
 
 Terraform version manager
 
-Want to do the same things [https://github.com/Yleisradio/homebrew-terraforms](chtf) do for MacOS X with homebrew.
+Want to do the same things (https://github.com/Yleisradio/homebrew-terraforms)[chtf] do for MacOS X with homebrew.
 
 ## Install
 
