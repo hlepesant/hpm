@@ -10,6 +10,8 @@ HCORP_RELEASE="releases.hashicorp.com"
 HCORP_DIR="/opt/hashicorp"
 PRODUCT="terraform"
 
+DEBUG=1
+
 function get_os() {
 	case "${OSTYPE}" in
 	  solaris*) echo "solaris" ;;
@@ -42,14 +44,10 @@ function test_depends() {
 	local current_os=${1}
 	case "${current_os}" in
 		solaris*) echo "solaris todo" ;;
-		darwin*)  echo "osx todo" ;; 
+		darwin*)  echo "install chtf formula with hombrew : brew instaff chtf"; exit 0 ;; 
 		linux*)
 			if [[ ! -x /usr/bin/unzip ]]; then
 				echo "install unzip"
-				exit 65
-			fi
-			if [[ ! -x /usr/bin/curl ]]; then
-				echo "install curl"
 				exit 65
 			fi
 			if [[ ! -x /usr/bin/wget ]]; then
@@ -63,17 +61,18 @@ function test_depends() {
 	esac
 }
 
-function list_installed_version() {
+function list_installed_releases() {
 	if [[ -d ${HCORP_DIR}/${PRODUCT} ]]
 	then
-		versions=$(find ${HCORP_DIR} -mindepth 1 -type d)
+		releases=$(find ${HCORP_DIR} -mindepth 1 -type d)
 	else
-		echo "No installed version"
+		echo "No installed release"
 	fi
 }
 
-function check_version_is_installed() {
-	if [[ ! -x ${HCORP_DIR}/${PRODUCT}/${version}/terraform ]]
+function check_release_is_installed() {
+	local rel=${1}
+	if [[ ! -x ${HCORP_DIR}/${PRODUCT}/${rel}/terraform ]]
 	then
 		echo "false"
 	else
@@ -83,36 +82,55 @@ function check_version_is_installed() {
 
 function get_zip_url() {
 	# http://releases.hashicorp.com/terraform/0.11.1/terraform_0.11.1_linux_amd64.zip
-	zip_url=$(printf "%s://%s/%s/%s/%s_%s_%s_%s.zip" ${PROTO} ${HCORP_RELEASE} ${PRODUCT} ${version} ${PRODUCT} ${version} ${current_os} ${current_arch} ) 
+	local release=${1}
+	local zip=${2}
+	zip_url=$(printf "%s://%s/%s/%s/%s" ${PROTO} ${HCORP_RELEASE} ${PRODUCT} ${release} ${zip}) 
 	echo ${zip_url}
 }
 
 # https://gist.github.com/hrwgc/7455343
 function validate_url() {
-  echo "wget -S --spider $1  2>&1 | grep 'HTTP/1.1 200 OK'"
-  if [[ `wget -S --spider $1  2>&1 | grep 'HTTP/1.1 200 OK'` ]]; then echo "true"; else echo "false"; fi
+	local url=${1}	
+	#if [[ `wget -S --spider ${url} 2>&1 | grep 'HTTP/1.1 200 OK'` ]]; then echo "true"; else echo "false"; fi
+	valid=$(wget --no-hsts --timeout=5 --server-response --spider ${url} 2>&1|grep -c '^Remote file exists.')
+
+	if [[ ${valid} -eq "0" ]]; then
+		echo "This release is not available."
+		exit 0
+	fi
 }
 
 function get_zip_name() {
 	# terraform_0.11.1_linux_amd64.zip
-	zip_name=$(printf "%s_%s_%s_%s.zip" ${PRODUCT} ${version} ${current_os} ${current_arch} ) 
+	local rel=${1}
+	local os=${2}
+	local arch=${3}
+	zip_name=$(printf "%s_%s_%s_%s.zip" ${PRODUCT} ${rel} ${os} ${arch} ) 
 	echo ${zip_name}
 }
 
 function wget_zip() {
-	# http://releases.hashicorp.com/terraform/0.11.1/terraform_0.11.1_linux_amd64.zip
-	wget --quiet ${zip} --output-document=/tmp/${zipname}
+	local url=${1}
+	local output=${2}
+	if [[ ${DEBUG} -eq "1" ]]; then
+		echo "wget --no-hsts --quiet ${url} --output-document=/tmp/${output}"
+	fi
+	wget --no-hsts --quiet ${url} --output-document=/tmp/${output}
 }
 
-function create_version_folder() {
-	folder=$(printf "%s/%s/%s" ${HCORP_DIR} ${PRODUCT} ${version})
+function create_release_folder() {
+	local rel=${1}
+	folder=$(printf "%s/%s/%s" ${HCORP_DIR} ${PRODUCT} ${rel})
 	mkdir -p ${folder}
+	echo ${folder}
 }
 
 function unzip_archive() {
 	# unzip -qq /tmp/terraform_0.11.1_linux_amd64.zip -d /home/hugues/opt/hashicorp/terraform/0.11.1/
-	unzip -o -f -qq /tmp/${zipname} -d ${folder}
-	rm -f /tmp/${zipname}
+	local zip=${1}
+	local dir=${2}
+	unzip -f -qq /tmp/${zip} -d ${dir}/
+	rm -f /tmp/${zip}
 }
 
 function create_link() {
@@ -126,44 +144,38 @@ function run_tf_version() {
 
 if [ $# -eq 0 ]
 then
-	echo "List installed version"
-	list_installed_version
+	echo "List installed release"
+	list_installed_release
 else
-	version=${1}
+	test_sudo_user
+
+	release=${1}
 	current_os=$(get_os)
 	current_arch=$(get_arch)
 
-	test_sudo_user
 	test_depends ${current_os}
 
-	echo "Check version is installed"
-	version_is_installed=$(check_version_is_installed)
-	echo ${version_is_installed}
+	release_is_installed=$(check_release_is_installed ${release})
 
-	if [[ "${version_is_installed}" -eq "1" ]]
+	if [[ "${release_is_installed}" -eq "1" ]]
 	then
-		echo "version ${version} is installed"
+		echo "release ${release} is installed"
 	else
-		echo "version ${version} is not installed"
-		zip=$(get_zip_url)
-
+		zipname=$(get_zip_name ${release} ${current_os} ${current_arch})
+		zip=$(get_zip_url ${release} ${zipname})
 		url_exists=$(validate_url ${zip})
-		echo ${url_exists}
-		exit 0
-
-		zipname=$(get_zip_name)
-
-		wget_zip
-		create_version_folder
-		unzip_archive
+		wget_zip ${zip} ${zipname}
+		folder=$(create_release_folder ${release})
+		unzip_archive ${zipname} ${folder}
 		create_link
 	fi
 
-	#echo "version installed : create symbolic link"
-	#echo "version not installed : "
+	run_tf_version
+	#echo "release installed : create symbolic link"
+	#echo "release not installed : "
 	#echo "get url for this OS"
 	#echo "download to tmp"
-	#echo "create version folder"
+	#echo "create release folder"
 	#echo "unzip archive to folder"
 	#echo "delete archive"
 	#echo "create symbolic link"
