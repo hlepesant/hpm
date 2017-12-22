@@ -6,7 +6,7 @@ PROTO="https"
 #PROTO="http"
 HCORP_RELEASE="releases.hashicorp.com"
 HCORP_DIR="/opt/hashicorp"
-PRODUCT="terraform"
+PRODUCT="vault"
 
 DEBUG=1
 SHOW_VERSION=0

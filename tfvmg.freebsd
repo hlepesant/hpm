@@ -9,7 +9,7 @@ HCORP_DIR="/opt/hashicorp"
 PRODUCT="terraform"
 
 DEBUG=1
-SHOW_TF_VERSION=0
+SHOW_VERSION=0
 
 function get_os() {
 	case "${OSTYPE}" in
@@ -98,7 +98,7 @@ function get_activ_release {
 
 function check_release_is_installed() {
 	local rel=${1}
-	if [[ ! -x ${HCORP_DIR}/${PRODUCT}/${rel}/terraform ]]
+	if [[ ! -x ${HCORP_DIR}/${PRODUCT}/${rel}/${PRODUCT} ]]
 	then
 		echo "0"
 	else
@@ -106,7 +106,6 @@ function check_release_is_installed() {
 	fi
 }
 
-# http://releases.hashicorp.com/terraform/0.11.1/terraform_0.11.1_linux_amd64.zip
 function get_zip_url() {
 	local release=${1}
 	local zipname=${2}
@@ -126,7 +125,6 @@ function validate_url() {
 	fi
 }
 
-# terraform_0.11.1_linux_amd64.zip
 function get_zip_name() {
 	local rel=${1}
 	local os=${2}
@@ -155,7 +153,6 @@ function create_release_folder() {
 	mkdir -p ${folder}
 }
 
-# unzip -qq /tmp/terraform_0.11.1_linux_amd64.zip -d /home/hugues/opt/hashicorp/terraform/0.11.1/
 function unzip_archive() {
 	local zip_name=${1}
 	local dir=${2}
@@ -169,12 +166,12 @@ function unzip_archive() {
 
 function create_link() {
 	local dir=${1}
-	rm -f /usr/local/bin/terraform
-	ln -s ${dir}/terraform /usr/local/bin/terraform
+	rm -f /usr/local/bin/${PRODUCT}
+	ln -s ${dir}/${PRODUCT} /usr/local/bin/${PRODUCT}
 }
 
-function run_tf_version() {
-	terraform --version
+function run_version() {
+	${PRODUCT} version
 }
 
 
@@ -223,8 +220,8 @@ else
 
 	create_link ${release_folder}
 
-	if [[ ${SHOW_TF_VERSION} -eq "1" ]]; then
-		run_tf_version
+	if [[ ${SHOW_VERSION} -eq "1" ]]; then
+		run_version
 	fi
 fi
 

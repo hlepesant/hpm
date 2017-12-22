@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/usr/local/bin/bash
 
 platform='unknown'
 
@@ -6,9 +6,9 @@ PROTO="https"
 #PROTO="http"
 HCORP_RELEASE="releases.hashicorp.com"
 HCORP_DIR="/opt/hashicorp"
-PRODUCT="terraform"
+PRODUCT="vault"
 
-DEBUG=1
+DEBUG=0
 SHOW_VERSION=0
 
 function get_os() {
@@ -28,7 +28,6 @@ function get_arch() {
 	  x86_64*) echo "amd64" ;;
 	  amd64*) echo "amd64" ;;
 	  x86_32*) echo "x86" ;;
-	  i86pc*) echo "amd64" ;;
 	  *)       echo "unknown: ${arch}" ;;
 	esac
 }
@@ -44,16 +43,7 @@ function test_sudo_user() {
 function test_depends() {
 	local current_os=${1}
 	case "${current_os}" in
-		solaris*)
-			if [[ ! -x /usr/bin/unzip ]]; then
-				echo "run : apt-get install unzip"
-				exit 65
-			fi
-			if [[ ! -x /usr/bin/wget ]]; then
-				echo "run : apt-get install wget"
-				exit 65
-			fi
-		;;
+		solaris*) echo "solaris todo" ;;
 		darwin*)  echo "install chtf formula with hombrew : brew instaff chtf"; exit 0 ;; 
 		linux*)
 			if [[ ! -x /usr/bin/unzip ]]; then
@@ -76,7 +66,7 @@ function test_depends() {
 			fi
 		;;
 		msys*)    echo "windows is not supported." && exit 666 ;;
-		*)        echo "unknown: ${current_os}" && exit 0 ;;
+		*)        echo "unknown: ${current_os}" ;;
 	esac
 }
 
@@ -176,19 +166,12 @@ function unzip_archive() {
 
 function create_link() {
 	local dir=${1}
-	local os=${2}
-	if [[ "${os}" -eq "solaris" ]]
-	then
-		rm -f /usr/bin/${PRODUCT}
-		ln -s ${dir}/${PRODUCT} /usr/bin/${PRODUCT}
-	else
-		rm -f /usr/local/bin/${PRODUCT}
-		ln -s ${dir}/${PRODUCT} /usr/local/bin/${PRODUCT}
-	fi
+	rm -f /usr/local/bin/${PRODUCT}
+	ln -s ${dir}/${PRODUCT} /usr/local/bin/${PRODUCT}
 }
 
 function run_version() {
-	${PRODUCT} --version
+	${PRODUCT} version
 }
 
 
@@ -235,7 +218,7 @@ else
 		unzip_archive ${zipname} ${release_folder}
 	fi
 
-	create_link ${release_folder} ${current_os}
+	create_link ${release_folder}
 
 	if [[ ${SHOW_VERSION} -eq "1" ]]; then
 		run_version
