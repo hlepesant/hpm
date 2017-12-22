@@ -7,9 +7,11 @@ Want to do the same things [chtf](https://github.com/Yleisradio/homebrew-terrafo
 ## Install
 
 ```shell
+cd ~
 git clone https://github.com/hlepesant/tfvmg.git
 mkdir ~/bin
-mv tfvmg/tfvmg ~/bin/
+mv tfvmg/tfvmg.linux ~/bin/tfvmg
+chmod u+x~/bin/tfvmg
 ```
 
 ## Usage
