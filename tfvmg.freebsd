@@ -74,7 +74,7 @@ function list_installed_releases() {
 	local current_active=${1}
 	if [[ -d ${HCORP_DIR}/${PRODUCT} ]]
 	then
-		for rel in `find ${HCORP_DIR} -mindepth 2 -maxdepth 2 -type d|sort --version-sort`
+		for rel in `find ${HCORP_DIR}/${PRODUCT} -mindepth 2 -maxdepth 2 -type d|sort --version-sort`
 		do
 			release=$(echo ${rel} | awk -F\/ '{print $NF}')
 			if [[ "${release}" == "${current_active}" ]]
