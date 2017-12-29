@@ -5,10 +5,13 @@ platform='unknown'
 PROTO="https"
 HCORP_RELEASE="releases.hashicorp.com"
 HCORP_DIR="/opt/hashicorp"
-PRODUCT="terraform"
+HCORP_PRODUCTS=("terraform" "vault" "vagrant" "consul" "packer" "nomad")
 
 DEBUG=1
 SHOW_VERSION=0
+
+bold=$(tput bold)
+normal=$(tput sgr0)
 
 function get_os() {
 	case "${OSTYPE}" in
@@ -163,9 +166,39 @@ function run_version() {
 	${PRODUCT} --version
 }
 
+function show_help() {
+  echo ""
+  echo "${bold}Hashicorp Product Manager${normal} aka hpm"
+  echo ""
+  echo "Usage :"
+  echo ""
+  echo "hpm <product> [release]"
+  echo ""
+  echo "Where ${bold}product${normal} can be :"
+  echo " - terraform"
+  echo " - vault"
+  echo ""
+  echo "And ${bold}release${normal} the version tou want to be activated"
+  echo ""
+}
 
 if [ $# -eq 0 ]
 then
+	show_help
+  exit 0
+fi
+
+
+if [ $# -eq 1 ]
+then
+  PRODUCT=${1}
+
+  if [[ ! " ${HCORP_PRODUCTS[@]} " =~ " ${PRODUCT} " ]]
+  then
+    echo "Product ${PRODUCT} not found or not supporeted. Sorry."
+    exit 100
+  fi
+
 	active_release=$(get_activ_release)
 	list_installed_releases ${active_release}
 else
