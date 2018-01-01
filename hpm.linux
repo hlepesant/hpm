@@ -5,7 +5,7 @@ platform='unknown'
 PROTO="https"
 HCORP_RELEASE="releases.hashicorp.com"
 HCORP_DIR="/opt/hashicorp"
-HCORP_PRODUCTS=("terraform" "vault" "consul" "packer" "nomad")
+HCORP_PRODUCTS=("terraform" "vault" "consul" "packer" "nomad" "serf" "sentinel")
 
 DEBUG=0
 SHOW_VERSION=1
