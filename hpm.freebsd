@@ -1,0 +1,259 @@
+#!/usr/local/bin/bash
+
+platform='unknown'
+
+PROTO="https"
+HCORP_RELEASE="releases.hashicorp.com"
+HCORP_DIR="/opt/hashicorp"
+HCORP_PRODUCTS=("terraform" "vault" "consul" "packer" "nomad" "serf" "sentinel")
+
+DEBUG=0
+SHOW_VERSION=1
+
+bold=$(tput bold)
+normal=$(tput sgr0)
+
+function get_os() {
+	case "${OSTYPE}" in
+	  solaris*) echo "solaris" ;;
+	  darwin*)  echo "osx" ;; 
+	  linux*)   echo "linux" ;;
+	  bsd*)     echo "freebsd" ;;
+	  msys*)    echo "windows" ;;
+	  *)        echo "unknown: ${OSTYPE}" ;;
+	esac
+}
+
+function get_arch() {
+	arch=$(uname -m)
+	case "${arch}" in
+	  x86_64*) echo "amd64" ;;
+	  x86_32*) echo "x86" ;;
+	  *)       echo "unknown: ${arch}" ;;
+	esac
+}
+
+function test_sudo_user() {
+	if [[ -z ${SUDO_USER} ]]
+	then
+		echo "run with sudo"
+		exit 64
+	fi
+}
+
+function test_depends() {
+	local current_os=${1}
+	case "${current_os}" in
+		solaris*) echo "solaris todo" ;;
+		darwin*)  echo "install chtf formula with hombrew : brew instaff chtf"; exit 0 ;; 
+		linux*)
+			if [[ ! -x /usr/bin/unzip ]]; then
+				echo "install unzip"
+				exit 65
+			fi
+			if [[ ! -x /usr/bin/wget ]]; then
+				echo "install wget"
+				exit 65
+			fi
+		;;
+		bsd*)     echo "freebsd todo" ;;
+		msys*)    echo "windows is not supported." && exit 666 ;;
+		*)        echo "unknown: ${current_os}" ;;
+	esac
+}
+
+function list_installed_releases() {
+	local p=${1}
+	local c=${2}
+	if [[ -d ${HCORP_DIR}/${p} ]]
+	then
+		for rel in `find ${HCORP_DIR}/${p} -mindepth 1 -maxdepth 1 -type d|sort --version-sort`
+		do
+			release=$(echo ${rel} | awk -F\/ '{print $NF}')
+			if [[ "${release}" == "${c}" ]]
+			then
+				echo " * ${release}"
+			else
+				echo "   ${release}"
+			fi
+		done
+	fi
+}
+
+function get_activ_release() {
+  local p=${1}
+	local activ=""
+	if [[ -L "/usr/local/bin/${p}" ]]
+	then
+		activ=$(ls -l /usr/local/bin/${p} |awk '{print $NF}'|awk -F\/ '{print $5}')
+	fi
+	echo ${activ}
+}
+
+function check_release_is_installed() {
+  local p=${1}
+	local r=${2}
+	if [[ ! -x ${HCORP_DIR}/${p}/${r}/${p} ]]
+	then
+		echo "0"
+	else
+		echo "1"
+	fi
+}
+
+function get_releases_url() {
+	local p=${1}
+	local releases_url=$(printf "%s://%s/%s/%s" ${PROTO} ${HCORP_RELEASE} ${p}) 
+	echo ${releases_url}
+}
+
+function get_zip_url() {
+	local p=${1}
+	local r=${2}
+	local z=${3}
+	local zip_url=$(printf "%s://%s/%s/%s/%s" ${PROTO} ${HCORP_RELEASE} ${p} ${r} ${z}) 
+	echo ${zip_url}
+}
+
+# https://gist.github.com/hrwgc/7455343
+#if [[ `wget -S --spider ${url} 2>&1 | grep 'HTTP/1.1 200 OK'` ]]; then echo "true"; else echo "false"; fi
+function validate_url() {
+	local url=${1}	
+	local valid=$(wget --no-hsts --timeout=5 --server-response --spider ${url} 2>&1|grep -c 'HTTP/1.1 200 OK')
+
+	if [[ ${valid} -eq "0" ]]; then
+		echo "This release is not available."
+		exit 0
+	fi
+}
+
+function get_zip_name() {
+	local p=${1}
+	local r=${2}
+	local o=${3}
+	local a=${4}
+	local zip_name=$(printf "%s_%s_%s_%s.zip" ${p} ${r} ${o} ${a}) 
+	echo ${zip_name}
+}
+
+function wget_zip() {
+	local url=${1}
+	local output=${2}
+	if [[ ${DEBUG} -eq "1" ]]; then
+		echo "wget --no-hsts --quiet ${url} --output-document=/tmp/${output}"
+	fi
+	wget --no-hsts --quiet ${url} --output-document=/tmp/${output}
+}
+
+function get_release_folder() {
+	local p=${1}
+	local r=${2}
+	local folder=$(printf "%s/%s/%s" ${HCORP_DIR} ${p} ${r})
+	echo ${folder}
+}
+
+function create_release_folder() {
+	local f=${1}
+	mkdir -p ${f}
+}
+
+function unzip_archive() {
+	local z=${1}
+	local d=${2}
+	if [[ ${DEBUG} -eq "1" ]]; then
+		echo "unzip -qq /tmp/${z} -d ${d}/"
+		echo "rm -f /tmp/${z}"
+	fi
+	unzip -qq /tmp/${z} -d ${d}/
+	rm -f /tmp/${z}
+}
+
+function create_link() {
+	local p=${1}
+	local d=${2}
+	rm -f /usr/local/bin/${p}
+	ln -s ${d}/${p} /usr/local/bin/${p}
+}
+
+function run_version() {
+	local p=${1}
+	${p} --version
+}
+
+function show_help() {
+  echo ""
+  echo "${bold}Hashicorp Product Manager${normal} aka hpm"
+  echo ""
+  echo "Usage :"
+  echo ""
+  echo "hpm <product> [release]"
+  echo ""
+  echo "Where ${bold}product${normal} can be :"
+  for p in "${HCORP_PRODUCTS[@]}"
+  do
+    echo " - ${p}"
+  done
+  echo ""
+  echo "And ${bold}release${normal} the version tou want to be activated"
+  echo ""
+}
+
+if [ $# -eq 0 ]
+then
+	show_help
+  exit 0
+fi
+
+
+if [ $# -eq 1 ]
+then
+  product=${1}
+
+  if [[ ! " ${HCORP_PRODUCTS[@]} " =~ " ${product} " ]]
+  then
+    echo "Product ${product} not found or not supporeted. Sorry."
+    exit 100
+  fi
+
+	active_release=$(get_activ_release ${product})
+	list_installed_releases ${product} ${active_release}
+		
+  url_releases=$(get_releases_url ${product} ${release})
+  echo ""
+  echo "To get avaliable releases check this link :"
+  echo " - ${url_releases}"
+  echo ""
+  exit 0
+else
+	test_sudo_user
+
+  product=${1}
+	release=${2}
+	current_os=$(get_os)
+	current_arch=$(get_arch)
+
+	test_depends ${current_os}
+
+	release_folder=$(get_release_folder ${product} ${release})
+	release_is_installed=$(check_release_is_installed ${product} ${release})
+
+	if [[ "${release_is_installed}" -ne "1" ]]
+	then
+		zipname=$(get_zip_name ${product} ${release} ${current_os} ${current_arch})
+		zip=$(get_zip_url ${product} ${release} ${zipname})
+		url_exists=$(validate_url ${zip})
+
+		wget_zip ${zip} ${zipname}
+
+		create_release_folder ${release_folder}
+		unzip_archive ${zipname} ${release_folder}
+	fi
+  
+	create_link ${product} ${release_folder}
+
+	if [[ ${SHOW_VERSION} -eq "1" ]]; then
+		run_version ${product}
+	fi
+fi
+
+exit 0
