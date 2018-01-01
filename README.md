@@ -1,4 +1,4 @@
-# Hashicorp Product Manager
+# Hashicorp Products Manager
 
 Claim to do the job as [chtf](https://github.com/Yleisradio/homebrew-terraforms) do for MacOS X with homebrew,  
 but want to support many products from [Hashicorp](https://www.hashicorp.com/).
