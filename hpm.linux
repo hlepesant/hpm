@@ -172,10 +172,10 @@ function wget_archive() {
 	local output=${2}
 	if [[ ${DEBUG} -eq "1" ]]; then
 		#echo "wget --no-hsts --quiet ${url} --output-document=/tmp/${output}"
-		echo "wget --show-progress --progress=dot --no-hsts ${url} --output-document=/tmp/${output}"
+		echo "wget --show-progress --progress=bar --no-hsts ${url} --output-document=/tmp/${output}"
 	fi
 	#wget --no-hsts --quiet ${url} --output-document=/tmp/${output}
-	wget --show-progress --progress=dot --no-hsts ${url} --output-document=/tmp/${output}
+	wget --show-progress --progress=bar --no-hsts ${url} --output-document=/tmp/${output}
 }
 
 function get_release_folder() {
