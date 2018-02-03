@@ -8,7 +8,7 @@ HCORP_DIR="/opt/hashicorp"
 HCORP_PRODUCTS=("terraform" "vault" "consul" "packer" "nomad" "serf" "sentinel" "vagrant")
 PACKAGED_PRODUCTS=("vagrant")
 
-DEBUG=0
+DEBUG=1
 SHOW_VERSION=1
 TIMEOUT=10
 
@@ -337,7 +337,12 @@ else
     echo ${archive_ext}
   fi
 
-  release_folder=$(get_release_folder ${product} ${release})
+  if [[ ! " ${PACKAGED_PRODUCTS[@]} " =~ " ${product} " ]]
+  then
+    release_folder=$(get_release_folder ${product} ${release})
+  else
+    release_folder=""
+  fi
   release_is_installed=$(check_release_is_installed ${product} ${release})
 
   if [[ ${DEBUG} -eq "1" ]]; then
