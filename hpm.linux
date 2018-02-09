@@ -16,121 +16,148 @@ bold=$(tput bold)
 normal=$(tput sgr0)
 
 function get_os() {
-	case "${OSTYPE}" in
-	  solaris*) echo "solaris" ;;
-	  darwin*)  echo "osx" ;; 
-	  linux*)   echo "linux" ;;
-	  bsd*)     echo "freebsd" ;;
-	  msys*)    echo "windows" ;;
-	  *)        echo "unknown: ${OSTYPE}" ;;
-	esac
+  case "${OSTYPE}" in
+    solaris*) echo "solaris" ;;
+    darwin*)  echo "osx" ;; 
+    linux*)   echo "linux" ;;
+    bsd*)     echo "freebsd" ;;
+    msys*)    echo "windows" ;;
+    *)        echo "unknown: ${OSTYPE}" ;;
+  esac
 }
 
 function get_arch() {
-	arch=$(uname -m)
-	case "${arch}" in
-	  x86_64*) echo "amd64" ;;
-	  x86_32*) echo "x86" ;;
-	  *)       echo "unknown: ${arch}" ;;
-	esac
+  arch=$(uname -m)
+  case "${arch}" in
+    x86_64*) echo "amd64" ;;
+    x86_32*) echo "x86" ;;
+    *)       echo "unknown: ${arch}" ;;
+  esac
 }
 
 function test_sudo_user() {
-	if [[ -z ${SUDO_USER} ]]
-	then
-		echo "run with sudo"
-		exit 64
-	fi
+  if [[ -z ${SUDO_USER} ]]
+  then
+    echo "run with sudo"
+    exit 64
+  fi
 }
 
 function test_depends() {
-	local current_os=${1}
-	case "${current_os}" in
-		solaris*) echo "solaris todo" ;;
-		darwin*)  echo "install chtf formula with hombrew : brew instaff chtf"; exit 0 ;; 
-		linux*)
-			if [[ ! -x /usr/bin/unzip ]]; then
-				echo "install unzip"
-				exit 65
-			fi
-			if [[ ! -x /usr/bin/wget ]]; then
-				echo "install wget"
-				exit 65
-			fi
-		;;
-		bsd*)     echo "freebsd todo" ;;
-		msys*)    echo "windows is not supported." && exit 666 ;;
-		*)        echo "unknown: ${current_os}" ;;
-	esac
+  local current_os=${1}
+  case "${current_os}" in
+    solaris*) echo "solaris todo" ;;
+    darwin*)  echo "install chtf formula with hombrew : brew instaff chtf"; exit 0 ;; 
+    linux*)
+      if [[ ! -x /usr/bin/unzip ]]; then
+        echo "install unzip"
+        exit 65
+      fi
+      if [[ ! -x /usr/bin/wget ]]; then
+        echo "install wget"
+        exit 65
+      fi
+    ;;
+    bsd*)     echo "freebsd todo" ;;
+    msys*)    echo "windows is not supported." && exit 666 ;;
+    *)        echo "unknown: ${current_os}" ;;
+  esac
 }
 
 function list_installed_releases() {
-	local p=${1}
-	local c=${2}
-	if [[ -d ${HCORP_DIR}/${p} ]]
-	then
-		for rel in `find ${HCORP_DIR}/${p} -mindepth 1 -maxdepth 1 -type d|sort --version-sort`
-		do
-			release=$(echo ${rel} | awk -F\/ '{print $NF}')
-			if [[ "${release}" == "${c}" ]]
-			then
-				echo " * ${release}"
-			else
-				echo "   ${release}"
-			fi
-		done
-	fi
+  local p=${1}
+  local c=${2}
+  if [[ -d ${HCORP_DIR}/${p} ]]
+  then
+    for rel in `find ${HCORP_DIR}/${p} -mindepth 1 -maxdepth 1 -type d|sort --version-sort`
+    do
+      release=$(echo ${rel} | awk -F\/ '{print $NF}')
+      if [[ "${release}" == "${c}" ]]
+      then
+        echo " * ${release}"
+      else
+        echo "   ${release}"
+      fi
+    done
+  fi
 }
 
 function get_activ_release() {
   local p=${1}
-	local activ=""
-	if [[ -L "/usr/local/bin/${p}" ]]
-	then
-		activ=$(ls -l /usr/local/bin/${p} |awk '{print $NF}'|awk -F\/ '{print $5}')
-	fi
-	echo ${activ}
+  local activ=""
+  if [[ -L "/usr/local/bin/${p}" ]]
+  then
+    activ=$(ls -l /usr/local/bin/${p} |awk '{print $NF}'|awk -F\/ '{print $5}')
+  fi
+  echo ${activ}
 }
 
 function check_release_is_installed() {
   local p=${1}
-	local r=${2}
-	if [[ ! -x ${HCORP_DIR}/${p}/${r}/${p} ]]
-	then
-		echo "0"
-	else
-		echo "1"
-	fi
+  local r=${2}
+
+  if [[ " ${PACKAGED_PRODUCTS[@]} " =~ " ${p} " ]]
+  then
+    check_release_is_installed_from_package ${p} ${r}
+  else
+    check_release_is_installed_from_archive ${p} ${r}
+  fi
+}
+
+function check_release_is_installed_from_archive() {
+  local p=${1}
+  local r=${2}
+  if [[ ! -x ${HCORP_DIR}/${p}/${r}/${p} ]]
+  then
+    echo "0"
+  else
+    echo "1"
+  fi
+}
+
+function check_release_is_installed_from_package() {
+  local d=$(get_distribution)
+
+  case "${d}" in
+    debian|ubuntu)
+        #dpkg -l vagrant|grep vagrant|awk '{print $3}'
+        res=$(dpkg -l ${p}|grep -c ${p})
+      ;;
+    redhat|centos|fedora)
+        res=$(rpm -qa|grep -c ${p})
+      ;; 
+  esac
+  echo ${res}
 }
 
 function get_releases_url() {
-	local p=${1}
-	local releases_url=$(printf "%s://%s/%s/%s" ${PROTO} ${HCORP_RELEASE} ${p}) 
-	echo ${releases_url}
+  local p=${1}
+  local releases_url=$(printf "%s://%s/%s/%s" ${PROTO} ${HCORP_RELEASE} ${p}) 
+  echo ${releases_url}
 }
 
 function get_archive_url() {
-	local p=${1}
-	local r=${2}
-	local z=${3}
-	local archive_url=$(printf "%s://%s/%s/%s/%s" ${PROTO} ${HCORP_RELEASE} ${p} ${r} ${z}) 
-	echo ${archive_url}
+  local p=${1}
+  local r=${2}
+  local z=${3}
+  local archive_url=$(printf "%s://%s/%s/%s/%s" ${PROTO} ${HCORP_RELEASE} ${p} ${r} ${z}) 
+  echo ${archive_url}
 }
 
 # https://gist.github.com/hrwgc/7455343
 #if [[ `wget -S --spider ${url} 2>&1 | grep 'HTTP/1.1 200 OK'` ]]; then echo "true"; else echo "false"; fi
 function validate_url() {
-	local url=${1}	
-	if [[ ${DEBUG} -eq "1" ]]; then
-	    echo "wget --no-hsts --timeout=${TIMEOUT} --server-response --spider ${url} 2>&1|grep -c 'HTTP/1.1 200 OK'"
-	fi
+  local url=${1}  
+  if [[ ${DEBUG} -eq "1" ]]; then
+      echo "wget --no-hsts --timeout=${TIMEOUT} --server-response --spider ${url} 2>&1|grep -c 'HTTP/1.1 200 OK'"
+  fi
 
-	local valid=$(wget --no-hsts --timeout=${TIMEOUT} --server-response --spider ${url} 2>&1|grep -c 'HTTP/1.1 200 OK')
+  local valid=$(wget --no-hsts --timeout=${TIMEOUT} --server-response --spider ${url} 2>&1|grep -c 'HTTP/1.1 200 OK')
 
-	if [[ ${valid} -eq "0" ]]; then
-		echo "This release is not available."
-		exit 0
-	fi
+  if [[ ${valid} -eq "0" ]]; then
+    echo "This release is not available."
+    exit 0
+  fi
 }
 
 function get_distribution() {
@@ -139,32 +166,45 @@ function get_distribution() {
 }
 
 function get_archive_extension() {
-	local p=${1}
-    local d=$(lsb_release -i -s|tr '[:upper:]' '[:lower:]')
+  local p=${1}
+  local d=$(get_distribution)
 
-    if [[ ! " ${PACKAGED_PRODUCTS[@]} " =~ " ${p} " ]]
-    then
-      echo "zip"
-    else
-	    case "${d}" in
-	      debian*) echo "deb" ;;
-	      ubuntu*) echo "deb" ;;
-	      redhat*) echo "rpm" ;; 
-	      centos*) echo "rpm" ;; 
-	      fedora*) echo "rpm" ;; 
-	      *)       echo "tar.xz" ;;
-	    esac
-    fi
+  if [[ ! " ${PACKAGED_PRODUCTS[@]} " =~ " ${p} " ]]
+  then
+    echo "zip"
+  else
+    case "${d}" in
+      debian*) echo "deb" ;;
+      ubuntu*) echo "deb" ;;
+      redhat*) echo "rpm" ;; 
+      centos*) echo "rpm" ;; 
+      fedora*) echo "rpm" ;; 
+      *)       echo "tar.xz" ;;
+    esac
+  fi
 }
 
 function get_archive_name() {
-	local p=${1}
-	local r=${2}
-	local o=${3}
-	local a=${4}
-	local e=${5}
-	local archive_name=$(printf "%s_%s_%s_%s.%s" ${p} ${r} ${o} ${a} ${e}) 
-	echo ${archive_name}
+  local p=${1}
+  local r=${2}
+  local o=${3}
+  local a=${4}
+  local e=${5}
+
+  if [[ " ${PACKAGED_PRODUCTS[@]} " =~ " ${p} " ]]
+  then
+    if [[ ${a} -eq "amd64" ]]
+    then
+      na="x86_64"
+    else
+      na="i686"
+    fi
+    local archive_name=$(printf "%s_%s_%s.%s" ${p} ${r} ${na} ${e}) 
+  else
+    local archive_name=$(printf "%s_%s_%s_%s.%s" ${p} ${r} ${o} ${a} ${e}) 
+  fi
+
+  echo ${archive_name}
 }
 
 function wget_archive() {
@@ -179,53 +219,54 @@ function wget_archive() {
 }
 
 function get_release_folder() {
-	local p=${1}
-	local r=${2}
-	local folder=$(printf "%s/%s/%s" ${HCORP_DIR} ${p} ${r})
-	echo ${folder}
+  local p=${1}
+  local r=${2}
+  local folder=$(printf "%s/%s/%s" ${HCORP_DIR} ${p} ${r})
+  echo ${folder}
 }
 
 function create_release_folder() {
-	local f=${1}
-	mkdir -p ${f}
+  local f=${1}
+  mkdir -p ${f}
 }
 
 function unzip_archive() {
-	local z=${1}
-	local d=${2}
-	if [[ ${DEBUG} -eq "1" ]]; then
-		echo "unzip -qq /tmp/${z} -d ${d}/"
-		echo "rm -f /tmp/${z}"
-	fi
-	unzip -qq /tmp/${z} -d ${d}/
-	rm -f /tmp/${z}
+  local z=${1}
+  local d=${2}
+  if [[ ${DEBUG} -eq "1" ]]; then
+    echo "unzip -qq /tmp/${z} -d ${d}/"
+    echo "rm -f /tmp/${z}"
+  fi
+  unzip -qq /tmp/${z} -d ${d}/
+  rm -f /tmp/${z}
 }
 
 
 function install_package() {
-    local d=${$1}
-    local p=${$2}
+  local d=${1}
+  local p=${2}
 
-	case "${d}" in
-	  debian|ubuntu)
-        dpkg -i ${p}
+  case "${d}" in
+    debian|ubuntu)
+        dpkg -i /tmp/${p}
+        apt-get -f install
       ;;
-	  redhat|centos|fedora)
-        rpm -Uvh ${p}
+    redhat|centos|fedora)
+        rpm -ivh /tmp/${p}
       ;; 
-	esac
+  esac
 }
 
 function create_link() {
-	local p=${1}
-	local d=${2}
-	rm -f /usr/local/bin/${p}
-	ln -s ${d}/${p} /usr/local/bin/${p}
+  local p=${1}
+  local d=${2}
+  rm -f /usr/local/bin/${p}
+  ln -s ${d}/${p} /usr/local/bin/${p}
 }
 
 function run_version() {
-	local p=${1}
-	${p} --version
+  local p=${1}
+  ${p} --version
 }
 
 function show_help() {
@@ -248,7 +289,7 @@ function show_help() {
 
 if [ $# -eq 0 ]
 then
-	show_help
+  show_help
   exit 0
 fi
 
@@ -256,6 +297,7 @@ fi
 if [ $# -eq 1 ]
 then
   product=${1}
+  distribution=$(lsb_release -i -s|tr '[:upper:]' '[:lower:]')
 
   if [[ ! " ${HCORP_PRODUCTS[@]} " =~ " ${product} " ]]
   then
@@ -263,9 +305,9 @@ then
     exit 100
   fi
 
-	active_release=$(get_activ_release ${product})
-	list_installed_releases ${product} ${active_release}
-		
+  active_release=$(get_activ_release ${product})
+  list_installed_releases ${product} ${active_release}
+    
   url_releases=$(get_releases_url ${product} ${release})
   echo ""
   echo "To get avaliable releases check this link :"
@@ -273,47 +315,72 @@ then
   echo ""
   exit 0
 else
-	test_sudo_user
+  test_sudo_user
 
-    product=${1}
-	release=${2}
-	current_os=$(get_os)
-	current_arch=$(get_arch)
+  product=${1}
+  release=${2}
+  current_os=$(get_os)
+  current_arch=$(get_arch)
 
-	test_depends ${current_os}
+  if [[ ${DEBUG} -eq "1" ]]; then
+    echo ${current_os}
+    echo ${current_arch}
+  fi
 
-    distrib=$(get_distribution)
-    archive_ext=$(get_archive_extension ${product})
+  test_depends ${current_os}
 
-	release_folder=$(get_release_folder ${product} ${release})
-	release_is_installed=$(check_release_is_installed ${product} ${release})
+  distrib=$(get_distribution)
+  archive_ext=$(get_archive_extension ${product})
 
-	if [[ "${release_is_installed}" -ne "1" ]]
-	then
+  if [[ ${DEBUG} -eq "1" ]]; then
+    echo ${distrib}
+    echo ${archive_ext}
+  fi
 
-		archive_name=$(get_archive_name ${product} ${release} ${current_os} ${current_arch} ${archive_ext})
-		archive=$(get_archive_url ${product} ${release} ${archive_name})
-		url_exists=$(validate_url ${archive})
+  if [[ ! " ${PACKAGED_PRODUCTS[@]} " =~ " ${product} " ]]
+  then
+    release_folder=$(get_release_folder ${product} ${release})
+  else
+    release_folder=""
+  fi
+  release_is_installed=$(check_release_is_installed ${product} ${release})
 
-		wget_archive ${archive} ${archive_name}
+  if [[ ${DEBUG} -eq "1" ]]; then
+    echo ${release_folder}
+    echo ${release_is_installed}
+  fi
 
-        if [[ "${archive_ext}" -eq "zip" ]]
-        then
-		    create_release_folder ${release_folder}
-		    unzip_archive ${archive_name} ${release_folder}
-        else
-            install_package ${distrib} ${archive_name}
-        fi
-	fi
-  
-    if [[ "${archive_ext}" -eq "zip" ]]
-    then
-	    create_link ${product} ${release_folder}
+  if [[ "${release_is_installed}" -ne "1" ]]
+  then
+    archive_name=$(get_archive_name ${product} ${release} ${current_os} ${current_arch} ${archive_ext})
+    archive=$(get_archive_url ${product} ${release} ${archive_name})
+    url_exists=$(validate_url ${archive})
+
+    if [[ ${DEBUG} -eq "1" ]]; then
+      echo ${archive_name}
+      echo ${archive}
+      echo ${url_exists}
     fi
 
-	if [[ ${SHOW_VERSION} -eq "1" ]]; then
-		run_version ${product}
-	fi
+    wget_archive ${archive} ${archive_name}
+
+    if [[ " ${PACKAGED_PRODUCTS[@]} " =~ " ${product} " ]]
+    then
+      install_package ${distrib} ${archive_name}
+    else
+      create_release_folder ${release_folder}
+      unzip_archive ${archive_name} ${release_folder}
+    fi
+  fi
+  
+  if [[ ! " ${PACKAGED_PRODUCTS[@]} " =~ " ${product} " ]]
+  then
+    create_link ${product} ${release_folder}
+  fi
+
+  if [[ ${SHOW_VERSION} -eq "1" ]]; then
+    run_version ${product}
+  fi
 fi
 
 exit 0
