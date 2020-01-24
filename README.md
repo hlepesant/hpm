@@ -44,7 +44,7 @@ To get avaliable releases check this link :
 
 ## Supported Operating Systems
 
-* GNU/Linux : tested on [Debian](https://www.debian.org/) ans [Ubuntu](https://www.ubuntu.com/)
+* GNU/Linux : tested on [Debian](https://www.debian.org/) and [Ubuntu](https://www.ubuntu.com/)
 * FreeBSD   : tested on [FreeBSD](https://www.freebsd.org/)
 * Solaris   : tested on [OmniOS](https://omnios.omniti.com/)
 
