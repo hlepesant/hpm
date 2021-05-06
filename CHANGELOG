@@ -1,0 +1,5 @@
+v1.2.0
+======
+
+ * Change install location to user writable directory
+ * remove sudo needs

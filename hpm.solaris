@@ -4,7 +4,7 @@ platform='unknown'
 
 PROTO="https"
 HCORP_RELEASE="releases.hashicorp.com"
-HCORP_DIR="/opt/hashicorp"
+HCORP_DIR="${HOME}/hashicorp"
 HCORP_PRODUCTS=("terraform" "vault" "consul" "packer" "nomad" "serf" "sentinel")
 
 DEBUG=0
@@ -31,14 +31,6 @@ function get_arch() {
 	  x86_32*) echo "x86" ;;
 	  *)       echo "unknown: ${arch}" ;;
 	esac
-}
-
-function test_sudo_user() {
-	if [[ -z ${SUDO_USER} ]]
-	then
-		echo "run with sudo"
-		exit 64
-	fi
 }
 
 function test_depends() {
@@ -83,9 +75,9 @@ function list_installed_releases() {
 function get_activ_release() {
   local p=${1}
 	local activ=""
-	if [[ -L "/usr/local/bin/${p}" ]]
+	if [[ -L "${HOME}/bin/${p}" ]]
 	then
-		activ=$(ls -l /usr/local/bin/${p} |awk '{print $NF}'|awk -F\/ '{print $5}')
+		activ=$(ls -l ${HOME}/bin/${p} |awk '{print $NF}'|awk -F\/ '{print $5}')
 	fi
 	echo ${activ}
 }
@@ -171,8 +163,9 @@ function unzip_archive() {
 function create_link() {
 	local p=${1}
 	local d=${2}
-	rm -f /usr/local/bin/${p}
-	ln -s ${d}/${p} /usr/local/bin/${p}
+	mkdir -p ${HOME}/bin
+	rm -f ${HOME}/bin/${p}
+	ln -s ${d}/${p} ${HOME}/bin/${p}
 }
 
 function run_version() {
@@ -224,36 +217,34 @@ then
   echo " - ${url_releases}"
   echo ""
   exit 0
-else
-	test_sudo_user
+fi
 
-  product=${1}
-	release=${2}
-	current_os=$(get_os)
-	current_arch=$(get_arch)
+product=${1}
+release=${2}
+current_os=$(get_os)
+current_arch=$(get_arch)
 
-	test_depends ${current_os}
+test_depends ${current_os}
 
-	release_folder=$(get_release_folder ${product} ${release})
-	release_is_installed=$(check_release_is_installed ${product} ${release})
+release_folder=$(get_release_folder ${product} ${release})
+release_is_installed=$(check_release_is_installed ${product} ${release})
 
-	if [[ "${release_is_installed}" -ne "1" ]]
-	then
-		zipname=$(get_zip_name ${product} ${release} ${current_os} ${current_arch})
-		zip=$(get_zip_url ${product} ${release} ${zipname})
-		url_exists=$(validate_url ${zip})
+if [[ "${release_is_installed}" -ne "1" ]]
+then
+	zipname=$(get_zip_name ${product} ${release} ${current_os} ${current_arch})
+	zip=$(get_zip_url ${product} ${release} ${zipname})
+	url_exists=$(validate_url ${zip})
 
-		wget_zip ${zip} ${zipname}
+	wget_zip ${zip} ${zipname}
 
-		create_release_folder ${release_folder}
-		unzip_archive ${zipname} ${release_folder}
-	fi
-  
-	create_link ${product} ${release_folder}
+	create_release_folder ${release_folder}
+	unzip_archive ${zipname} ${release_folder}
+fi
 
-	if [[ ${SHOW_VERSION} -eq "1" ]]; then
-		run_version ${product}
-	fi
+create_link ${product} ${release_folder}
+
+if [[ ${SHOW_VERSION} -eq "1" ]]; then
+	run_version ${product}
 fi
 
 exit 0

@@ -4,7 +4,7 @@ platform='unknown'
 
 PROTO="https"
 HCORP_RELEASE="releases.hashicorp.com"
-HCORP_DIR="/opt/hashicorp"
+HCORP_DIR="${HOME}/.hpm/hashicorp"
 HCORP_PRODUCTS=("terraform" "vault" "consul" "packer" "nomad" "serf" "sentinel" "vagrant")
 PACKAGED_PRODUCTS=("vagrant")
 
@@ -33,14 +33,6 @@ function get_arch() {
     x86_32*) echo "x86" ;;
     *)       echo "unknown: ${arch}" ;;
   esac
-}
-
-function test_sudo_user() {
-  if [[ -z ${SUDO_USER} ]]
-  then
-    echo "run with sudo"
-    exit 64
-  fi
 }
 
 function test_depends() {
@@ -85,9 +77,9 @@ function list_installed_releases() {
 function get_activ_release() {
   local p=${1}
   local activ=""
-  if [[ -L "/usr/local/bin/${p}" ]]
+  if [[ -L "${HOME}/bin/${p}" ]]
   then
-    activ=$(ls -l /usr/local/bin/${p} |awk '{print $NF}'|awk -F\/ '{print $5}')
+    activ=$(ls -l ${HOME}/bin/${p} |awk '{print $NF}'|awk -F\/ '{print $5}')
   fi
   echo ${activ}
 }
@@ -260,8 +252,9 @@ function install_package() {
 function create_link() {
   local p=${1}
   local d=${2}
-  rm -f /usr/local/bin/${p}
-  ln -s ${d}/${p} /usr/local/bin/${p}
+  mkdir -p /${HOME}/bin
+  rm -f ${HOME}/bin/${p}
+  ln -s ${d}/${p} ${HOME}/bin/${p}
 }
 
 function run_version() {
@@ -314,73 +307,71 @@ then
   echo " - ${url_releases}"
   echo ""
   exit 0
+fi
+
+product=${1}
+release=${2}
+current_os=$(get_os)
+current_arch=$(get_arch)
+
+if [[ ${DEBUG} -eq "1" ]]; then
+  echo ${current_os}
+  echo ${current_arch}
+fi
+
+test_depends ${current_os}
+
+distrib=$(get_distribution)
+archive_ext=$(get_archive_extension ${product})
+
+if [[ ${DEBUG} -eq "1" ]]; then
+  echo ${distrib}
+  echo ${archive_ext}
+fi
+
+if [[ ! " ${PACKAGED_PRODUCTS[@]} " =~ " ${product} " ]]
+then
+  release_folder=$(get_release_folder ${product} ${release})
 else
-  test_sudo_user
+  release_folder=""
+fi
+release_is_installed=$(check_release_is_installed ${product} ${release})
 
-  product=${1}
-  release=${2}
-  current_os=$(get_os)
-  current_arch=$(get_arch)
+if [[ ${DEBUG} -eq "1" ]]; then
+  echo ${release_folder}
+  echo ${release_is_installed}
+fi
 
-  if [[ ${DEBUG} -eq "1" ]]; then
-    echo ${current_os}
-    echo ${current_arch}
-  fi
-
-  test_depends ${current_os}
-
-  distrib=$(get_distribution)
-  archive_ext=$(get_archive_extension ${product})
+if [[ "${release_is_installed}" -ne "1" ]]
+then
+  archive_name=$(get_archive_name ${product} ${release} ${current_os} ${current_arch} ${archive_ext})
+  archive=$(get_archive_url ${product} ${release} ${archive_name})
+  url_exists=$(validate_url ${archive})
 
   if [[ ${DEBUG} -eq "1" ]]; then
-    echo ${distrib}
-    echo ${archive_ext}
+    echo ${archive_name}
+    echo ${archive}
+    echo ${url_exists}
   fi
 
-  if [[ ! " ${PACKAGED_PRODUCTS[@]} " =~ " ${product} " ]]
+  wget_archive ${archive} ${archive_name}
+
+  if [[ " ${PACKAGED_PRODUCTS[@]} " =~ " ${product} " ]]
   then
-    release_folder=$(get_release_folder ${product} ${release})
+    install_package ${distrib} ${archive_name}
   else
-    release_folder=""
+    create_release_folder ${release_folder}
+    unzip_archive ${archive_name} ${release_folder}
   fi
-  release_is_installed=$(check_release_is_installed ${product} ${release})
+fi
 
-  if [[ ${DEBUG} -eq "1" ]]; then
-    echo ${release_folder}
-    echo ${release_is_installed}
-  fi
+if [[ ! " ${PACKAGED_PRODUCTS[@]} " =~ " ${product} " ]]
+then
+  create_link ${product} ${release_folder}
+fi
 
-  if [[ "${release_is_installed}" -ne "1" ]]
-  then
-    archive_name=$(get_archive_name ${product} ${release} ${current_os} ${current_arch} ${archive_ext})
-    archive=$(get_archive_url ${product} ${release} ${archive_name})
-    url_exists=$(validate_url ${archive})
-
-    if [[ ${DEBUG} -eq "1" ]]; then
-      echo ${archive_name}
-      echo ${archive}
-      echo ${url_exists}
-    fi
-
-    wget_archive ${archive} ${archive_name}
-
-    if [[ " ${PACKAGED_PRODUCTS[@]} " =~ " ${product} " ]]
-    then
-      install_package ${distrib} ${archive_name}
-    else
-      create_release_folder ${release_folder}
-      unzip_archive ${archive_name} ${release_folder}
-    fi
-  fi
-  
-  if [[ ! " ${PACKAGED_PRODUCTS[@]} " =~ " ${product} " ]]
-  then
-    create_link ${product} ${release_folder}
-  fi
-
-  if [[ ${SHOW_VERSION} -eq "1" ]]; then
-    run_version ${product}
-  fi
+if [[ ${SHOW_VERSION} -eq "1" ]]; then
+  run_version ${product}
 fi
 
 exit 0
